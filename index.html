@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Multihjälten</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%23ffd43b%22/><text x=%2250%%22 y=%2252%%22 font-size=%2275%22 font-weight=%22900%22 fill=%22%23103c70%22 text-anchor=%22middle%22 dominant-baseline=%22central%22 font-family=%22sans-serif%22>×</text></svg>">
+<style>
+  :root { --navy:#103c70; --blue:#1989ee; --gold:#ffd43b; --green:#49c65b; --purple:#a653ed; }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; min-height:100vh; color:#12345a;
+    font-family: "Trebuchet MS", system-ui, sans-serif;
+    background: linear-gradient(#77d6ff 0%, #d7f5ff 42%, #a6e58b 43%, #54b85f 100%);
+    display:flex; flex-direction:column; justify-content:center; align-items:center; padding:18px;
+  }
+  .game { width:min(980px,100%); background:rgba(255,255,255,.93); border:5px solid #174b82;
+    border-radius:28px; box-shadow:0 12px 0 #0c2e55, 0 18px 35px #174b8244; overflow:hidden; }
+  header { background:linear-gradient(120deg,#1469ba,#092f63); color:white; padding:16px 20px; display:flex; gap:14px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+  .hero { font-size:2.5rem; }
+  h1 { margin:0; font-size:clamp(1.3rem,4vw,2rem); }
+  .stats { display:flex; gap:9px; flex-wrap:wrap; }
+  .stat { background:#082b57; border:2px solid #68c9ff; border-radius:14px; padding:8px 12px; font-weight:800; white-space:nowrap; }
+  .scene { padding:clamp(16px,4vw,32px); background:linear-gradient(180deg,#c6f1ff,#f2fbff 62%,#ffe8a7); text-align:center; transition: background 0.2s ease; }
+  
+  /* Feedback-klasser för bakgrunden */
+  .scene.flash-correct { background: linear-gradient(180deg, #bcf5c8, #e2fbe6 62%, #c2f7ca) !important; }
+  .scene.flash-wrong { background: linear-gradient(180deg, #ffc9c9, #ffe2e2 62%, #ffb3b3) !important; }
+
+  .world { display:flex; align-items:center; justify-content:space-around; gap:16px; margin:0 auto 16px; max-width:700px; }
+  .character { font-size:clamp(4rem,12vw,7rem); filter:drop-shadow(0 5px 2px #174b8233); animation:bob 2s ease-in-out infinite; }
+  .monster { animation:bob 2.2s ease-in-out infinite reverse; }
+  @keyframes bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+  .speech { background:white; border:3px solid #f0bd50; border-radius:20px; padding:12px 20px; font-weight:900; font-size:clamp(1.4rem,5vw,2.8rem); box-shadow:0 5px 0 #dca044; display:inline-block; margin:6px 0 20px; }
+  .hint { margin:0 0 16px; font-size:1rem; color:#315578; }
+  .answers { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; max-width:680px; margin:auto; }
+  button { font:inherit; cursor:pointer; touch-action:manipulation; }
+  .answer { border:3px solid white; border-radius:18px; color:white; font-size:clamp(1.25rem,4vw,2rem); font-weight:900; padding:15px; box-shadow:0 5px 0 #174b8244; transition:transform .12s,filter .12s; }
+  .answer:hover:not(:disabled) { transform:translateY(-3px); filter:brightness(1.08); }
+  .answer:focus-visible, .small-btn:focus-visible, .mode-btn:focus-visible { outline:4px solid #ffb800; outline-offset:3px; }
+  .answer:disabled { cursor:default; opacity:.8; }
+  
+  /* Skak-animation */
+  .answer.shake { animation: shake 0.35s ease-in-out; }
+  @keyframes shake {
+    0% { transform: translateX(0); }
+    20% { transform: translateX(-8px) rotate(-3deg); }
+    40% { transform: translateX(8px) rotate(3deg); }
+    60% { transform: translateX(-6px) rotate(-2deg); }
+    80% { transform: translateX(6px) rotate(2deg); }
+    100% { transform: translateX(0); }
+  }
+
+  .a0{background:#1989ee}.a1{background:#48b955}.a2{background:#f5b900;color:#4c3500}.a3{background:#a653ed}.a4{background:#ef6c45}.a5{background:#e64b86}
+  .feedback { min-height:56px; margin:18px auto 0; font-size:1.15rem; font-weight:900; max-width:650px; }
+  .bottom { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; padding:0 18px 22px; background:#f2fbff; }
+  .small-btn { border:0; border-radius:13px; padding:11px 16px; background:#123e72; color:white; font-weight:800; box-shadow:0 4px 0 #082b57; }
+  .small-btn:hover { filter:brightness(1.12); }
+  .progress-wrap { padding:0 24px 18px; background:#f2fbff; }
+  .progress-label { display:flex; justify-content:space-between; gap:10px; font-size:.9rem; font-weight:800; margin-bottom:6px; }
+  .track { height:14px; background:#d5e8f6; border-radius:99px; overflow:hidden; border:2px solid #9bc7e6; }
+  .bar { height:100%; width:0%; background:linear-gradient(90deg,#ffce28,#ff9f1c); transition:width .3s; }
+  footer { text-align:center; background:#e3f6ff; padding:12px; color:#315578; font-size:.88rem; }
+
+  /* Äventyrsmeny */
+  .adventure-select { max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; text-align: center; }
+  .adventure-title { font-size: clamp(1.2rem, 3.5vw, 1.6rem); font-weight: 900; color: #103c70; margin: 0 0 10px; }
+  .mode-btn { border: 3px solid white; border-radius: 18px; color: white; font-size: clamp(1.1rem, 3.5vw, 1.5rem); font-weight: 900; padding: 14px 20px; box-shadow: 0 5px 0 #174b8244; transition: transform .12s, filter .12s; background: #1989ee; width: 100%; }
+  .mode-btn:hover { transform: translateY(-3px); filter: brightness(1.08); }
+  .mode-btn.hard { background: #ef6c45; }
+  .mode-btn.timed { background: #a653ed; }
+  .table-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-top: 6px; }
+  .table-btn { background: #48b955; padding: 12px 6px; font-size: clamp(1rem, 3vw, 1.3rem); }
+
+  /* Stylad Facit-tabell */
+  .cheat-sheet-container {
+    width: min(980px, 100%);
+    margin-top: 20px;
+    background: white;
+    border: 4px solid #174b82;
+    border-radius: 20px;
+    padding: 16px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    overflow-x: auto;
+  }
+  .cheat-title {
+    text-align: center;
+    font-size: 1.3rem;
+    font-weight: 900;
+    color: #103c70;
+    margin-bottom: 12px;
+  }
+  .cheat-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: center;
+    font-weight: 800;
+    font-size: clamp(0.75rem, 2vw, 1rem);
+  }
+  .cheat-table th, .cheat-table td {
+    border: 1.5px solid #333;
+    padding: 6px 4px;
+    min-width: 28px;
+  }
+  .cheat-table th {
+    background: #ffffff;
+    color: #000;
+  }
+  /* Färger liknande bilden */
+  .c-l1 { background-color: #ff00ff; color: #000; }
+  .c-l2 { background-color: #ffff99; color: #000; }
+  .c-l3 { background-color: #ffb6c1; color: #000; }
+  .c-l4 { background-color: #00ffff; color: #000; }
+  .c-l5 { background-color: #3366ff; color: #fff; }
+  .c-l6 { background-color: #ff6600; color: #fff; }
+  .c-l7 { background-color: #00cc00; color: #fff; }
+  .c-l8 { background-color: #cc0000; color: #fff; }
+  .c-l9 { background-color: #cc99ff; color: #000; }
+  .c-l10 { background-color: #99ccff; color: #000; }
+
+  /* Mobilanpassning */
+  @media (max-width: 600px) {
+    body { align-items: flex-start; padding: 4px; min-height: 100svh; }
+    .game { width: 100%; border-width: 3px; border-radius: 14px; }
+    header { padding: 8px 12px; gap: 8px; }
+    .hero { font-size: 1.6rem; }
+    h1 { font-size: clamp(1.1rem, 5vw, 1.4rem); }
+    header > div:first-child > div { font-size: .8rem; }
+    .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; gap: 4px; }
+    .stat { padding: 5px 2px; border-radius: 8px; font-size: clamp(.68rem, 2.5vw, .85rem); text-align: center; white-space: normal; }
+    .scene { padding: 10px 10px 8px; }
+    .world { gap: 2px; margin-bottom: 6px; }
+    .character { font-size: clamp(2.6rem, 13vw, 4rem); }
+    .speech { max-width: 100%; padding: 6px 12px; font-size: clamp(1.3rem, 7vw, 2rem); margin: 2px 0 8px; }
+    .hint { font-size: .85rem; margin-bottom: 8px; }
+    .answers { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; width: 100%; }
+    .answer { min-height: 46px; padding: 8px 4px; border-radius: 12px; font-size: clamp(1.1rem, 5vw, 1.5rem); }
+    .feedback { min-height: 36px; font-size: .9rem; margin-top: 6px; }
+    .progress-wrap { padding: 0 10px 10px; }
+    .progress-label { font-size: .75rem; margin-bottom: 3px; }
+    .bottom { gap: 6px; padding: 0 10px 12px; }
+    .small-btn { flex: 1 1 100px; min-height: 38px; padding: 8px 6px; font-size: .8rem; }
+    footer { padding: 6px; font-size: .75rem; }
+    .table-grid { gap: 5px; }
+    .mode-btn { padding: 10px 14px; font-size: clamp(1.0rem, 3vw, 1.3rem); }
+    .adventure-select { gap: 10px; }
+    .adventure-title { font-size: clamp(1.1rem, 3vw, 1.4rem); margin-bottom: 4px; }
+    .cheat-sheet-container { padding: 8px; margin-top: 10px; }
+    .cheat-table th, .cheat-table td { padding: 3px 1px; font-size: 0.7rem; }
+  }
+</style>
+</head>
+<body>
+<main class="game" aria-label="Tabellkampen mattespel">
+  <header>
+    <div style="display:flex;align-items:center;gap:10px"><span class="hero" aria-hidden="true">🦸</span><div><h1>Gångertabellhjälten</h1><div>Räkna rätt och rädda Fyllingeskolan!</div></div></div>
+    <div class="stats" aria-live="polite">
+      <div class="stat">⭐ Poäng: <span id="score">0</span></div>
+      <div class="stat" id="statMiddle">❤️ Liv: <span id="lives">❤️❤️❤️</span></div>
+      <div class="stat">🔥 I rad: <span id="streak">0</span></div>
+    </div>
+  </header>
+  <section class="scene" id="scene">
+    <div class="world">
+      <div class="character" aria-label="Superhjälte">🦸‍♀️</div>
+      <div style="font-size:2rem" aria-hidden="true">⚡</div>
+      <div class="character monster" id="monster" aria-label="Monster">👾</div>
+    </div>
+
+    <!-- Välj Äventyr (Meny) -->
+    <div id="adventureMenu" class="adventure-select">
+      <div class="adventure-title">🗺️ Välj ditt äventyr!</div>
+      <button class="mode-btn" id="btnMixed">🎲 Blandade tal (1–10)</button>
+      <button class="mode-btn hard" id="btnHard">🔥 Svårt äventyr (6, 7, 8, 9)</button>
+      <button class="mode-btn timed" id="btnTimed">⏳ Tidspress 60s (+2 sek per rätt)</button>
+      <div>
+        <div class="hint" style="margin-top:6px; font-weight:800;">ELLER VÄLJ EN ENSKILD TABELL:</div>
+        <div class="table-grid">
+          <button class="mode-btn table-btn" data-table="1">1</button>
+          <button class="mode-btn table-btn" data-table="2">2</button>
+          <button class="mode-btn table-btn" data-table="3">3</button>
+          <button class="mode-btn table-btn" data-table="4">4</button>
+          <button class="mode-btn table-btn" data-table="5">5</button>
+          <button class="mode-btn table-btn" data-table="6">6</button>
+          <button class="mode-btn table-btn" data-table="7">7</button>
+          <button class="mode-btn table-btn" data-table="8">8</button>
+          <button class="mode-btn table-btn" data-table="9">9</button>
+          <button class="mode-btn table-btn" data-table="10">10</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Spelyta -->
+    <div id="gamePlayArea" style="display:none;">
+      <div class="speech" id="question">6 × 4 = ?</div>
+      <p class="hint" id="hint">Välj rätt svar för att besegra monstret!</p>
+      <div class="answers" id="answers">
+        <button class="answer a0" data-index="0">18</button>
+        <button class="answer a1" data-index="1">22</button>
+        <button class="answer a2" data-index="2">24</button>
+        <button class="answer a3" data-index="3">28</button>
+        <button class="answer a4" data-index="4">30</button>
+        <button class="answer a5" data-index="5">32</button>
+      </div>
+    </div>
+
+    <div class="feedback" id="feedback" role="status" aria-live="polite"></div>
+  </section>
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-label"><span id="progressLabelTitle">🗺️ Äventyrsväg</span><span id="progressText">0 av 21 frågor</span></div>
+    <div class="track"><div class="bar" id="progress"></div></div>
+  </div>
+  <div class="bottom">
+    <button class="small-btn" id="hintBtn">💡 Visa en ledtråd</button>
+    <button class="small-btn" id="facitBtn">📖 Visa facit</button>
+    <button class="small-btn" id="restartBtn">🔄 Starta nytt spel</button>
+    <button class="small-btn" id="divisionBtn">➗ Testa division</button>
+  </div>
+  <footer>Tips: Du kan också använda tangenterna 1, 2, 3, 4, 5 och 6 för att svara.</footer>
+</main>
+
+<!-- Facit-sektion -->
+<div class="cheat-sheet-container" id="cheatSheetContainer" style="display:none;">
+  <div class="cheat-title">📊 Gångertabellen (Facit)</div>
+  <table class="cheat-table" id="cheatTable"></table>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  let score = 0, lives = 3, streak = 0, answered = 0, correctAnswer = 24, locked = false;
+  let selectedMode = null; 
+  let correctCount = 0, wrongCount = 0;
+  let timeLeft = 60, timerInterval = null;
+
+  const monsters = ["👾","👹","🐲","👻","🦖","🐉","🤖","🧌"];
+  const questionEl = $("question"), feedback = $("feedback"), hint = $("hint"), scene = $("scene");
+  const buttons = [...document.querySelectorAll(".answer")];
+
+  function shuffle(arr) { return arr.sort(() => Math.random() - .5); }
+
+  function buildCheatTable() {
+    const table = $("cheatTable");
+    let html = "<thead><tr><th>✕</th>";
+    for (let c = 1; c <= 10; c++) html += `<th>${c}</th>`;
+    html += "</tr></thead><tbody>";
+
+    for (let r = 1; r <= 10; r++) {
+      html += `<tr><th>${r}</th>`;
+      for (let c = 1; c <= 10; c++) {
+        const val = r * c;
+        const layer = Math.max(r, c);
+        html += `<td class="c-l${layer}">${val}</td>`;
+      }
+      html += "</tr>";
+    }
+    html += "</tbody>";
+    table.innerHTML = html;
+  }
+  buildCheatTable();
+
+  function startAdventure(mode) {
+    selectedMode = mode;
+    score = 0; streak = 0; answered = 0;
+    correctCount = 0; wrongCount = 0;
+    clearInterval(timerInterval);
+
+    if (selectedMode === 'timed') {
+      timeLeft = 60;
+      $("statMiddle").innerHTML = '⏱️ Tid: <span id="timer">60</span>s';
+      $("progressWrap").style.display = "none";
+      startTimer();
+    } else {
+      lives = 3;
+      $("statMiddle").innerHTML = '❤️ Liv: <span id="lives">❤️❤️❤️</span>';
+      $("progressWrap").style.display = "block";
+    }
+
+    $("adventureMenu").style.display = "none";
+    $("gamePlayArea").style.display = "block";
+    updateStats();
+    newQuestion();
+  }
+
+  function startTimer() {
+    timerInterval = setInterval(() => {
+      timeLeft--;
+      if (timeLeft <= 0) {
+        timeLeft = 0;
+        clearInterval(timerInterval);
+        updateStats();
+        endGame();
+      } else {
+        updateStats();
+      }
+    }, 1000);
+  }
+
+  function showMenu() {
+    locked = true;
+    clearInterval(timerInterval);
+    scene.classList.remove("flash-correct", "flash-wrong");
+    $("adventureMenu").style.display = "flex";
+    $("gamePlayArea").style.display = "none";
+    feedback.textContent = "";
+    questionEl.textContent = "";
+  }
+
+  function generateFactors() {
+    if (selectedMode === 'hard') {
+      const hardTables = [6, 7, 8, 9];
+      const a = hardTables[Math.floor(Math.random() * hardTables.length)];
+      const b = 1 + Math.floor(Math.random() * 10);
+      return Math.random() < 0.5 ? [a, b] : [b, a];
+    } else if (selectedMode === 'mixed' || selectedMode === 'timed') {
+      const a = 1 + Math.floor(Math.random() * 10);
+      const b = 1 + Math.floor(Math.random() * 10);
+      return [a, b];
+    } else {
+      const tableNum = parseInt(selectedMode, 10);
+      const b = 1 + Math.floor(Math.random() * 10);
+      return Math.random() < 0.5 ? [tableNum, b] : [b, tableNum];
+    }
+  }
+
+  function newQuestion() {
+    locked = false;
+    scene.classList.remove("flash-correct", "flash-wrong");
+    buttons.forEach(b => b.classList.remove("shake"));
+
+    if (selectedMode !== 'timed' && (lives <= 0 || answered >= 21)) return endGame();
+    if (selectedMode === 'timed' && timeLeft <= 0) return endGame();
+
+    let a, b;
+    if (selectedMode === 'division') {
+      const factor1 = 1 + Math.floor(Math.random() * 10);
+      const factor2 = 1 + Math.floor(Math.random() * 10);
+      const product = factor1 * factor2;
+      
+      correctAnswer = factor2;
+      questionEl.textContent = `${product} / ${factor1} = ?`;
+      a = product;
+      b = factor1;
+    } else {
+      [a, b] = generateFactors();
+      correctAnswer = a * b;
+      questionEl.textContent = `${a} × ${b} = ?`;
+    }
+
+    $("monster").textContent = monsters[Math.floor(Math.random() * monsters.length)];
+    hint.textContent = "Välj rätt svar för att besegra monstret!";
+    feedback.textContent = "";
+
+    const choices = new Set([correctAnswer]);
+    while (choices.size < 6) {
+      let candidate;
+      if (selectedMode === 'division') {
+        candidate = 1 + Math.floor(Math.random() * 10);
+      } else {
+        if (Math.random() < .65) candidate = correctAnswer + (Math.floor(Math.random() * 7) - 3) * (Math.random() < .5 ? (a || 1) : (b || 1));
+        else candidate = 1 + Math.floor(Math.random() * 100);
+      }
+      if (candidate > 0 && candidate !== correctAnswer) choices.add(candidate);
+    }
+    const opts = shuffle([...choices]);
+    buttons.forEach((btn,i) => { btn.textContent = opts[i]; btn.disabled = false; btn.dataset.value = opts[i]; });
+  }
+
+  function updateStats() {
+    $("score").textContent = score;
+    $("streak").textContent = streak;
+
+    if (selectedMode === 'timed') {
+      const timerEl = $("timer");
+      if (timerEl) timerEl.textContent = timeLeft;
+    } else {
+      const livesEl = $("lives");
+      if (livesEl) livesEl.textContent = "❤️".repeat(lives) + "🖤".repeat(3-lives);
+      $("progressText").textContent = `${answered} av 21 frågor`;
+      $("progress").style.width = `${answered*100/21}%`;
+    }
+  }
+
+  function answer(value, targetBtn) {
+    if (locked) return;
+    if (selectedMode !== 'timed' && (lives <= 0 || answered >= 21)) return;
+    if (selectedMode === 'timed' && timeLeft <= 0) return;
+
+    locked = true; answered++;
+    buttons.forEach(b => b.disabled = true);
+
+    if (targetBtn) {
+      targetBtn.classList.add("shake");
+    }
+
+    if (Number(value) === correctAnswer) {
+      correctCount++;
+      streak++;
+      score += 10 + (streak >= 3 ? 5 : 0);
+      scene.classList.add("flash-correct");
+
+      if (selectedMode === 'timed') {
+        timeLeft += 2;
+        feedback.textContent = "🎉 RÄTT! +2 sekunder på timern!";
+      } else {
+        feedback.textContent = streak >= 3 ? "🔥 SUPERKOMBO! Rätt svar! +15 poäng!" : "🎉 RÄTT! Monstret är besegrat! +10 poäng!";
+      }
+      $("monster").textContent = "💥";
+    } else {
+      wrongCount++;
+      streak = 0;
+      scene.classList.add("flash-wrong");
+
+      if (selectedMode === 'timed') {
+        timeLeft = Math.max(0, timeLeft - 1);
+        feedback.textContent = `Nästan! -1 sekund på timern. Rätt svar var ${correctAnswer}.`;
+      } else {
+        lives--;
+        feedback.textContent = `Nästan! Rätt svar var ${correctAnswer}. Kämpa vidare, superhjälte!`;
+      }
+      $("monster").textContent = "😈";
+    }
+
+    updateStats();
+
+    if ((selectedMode !== 'timed' && (lives <= 0 || answered >= 21)) || (selectedMode === 'timed' && timeLeft <= 0)) {
+      setTimeout(endGame, 500);
+    } else {
+      setTimeout(newQuestion, 500);
+    }
+  }
+
+  function endGame() {
+    locked = true;
+    clearInterval(timerInterval);
+    scene.classList.remove("flash-correct", "flash-wrong");
+    buttons.forEach(b => b.disabled = true);
+
+    if (selectedMode === 'timed') {
+      questionEl.textContent = "⏰ TIDEN ÄR SLUT!";
+      $("monster").textContent = "🏆";
+      hint.textContent = "Bra jobbat! Tryck på \"Starta nytt spel\" om du vill spela igen.";
+      feedback.textContent = `Slutresultat: ${score} poäng | 🟢 ${correctCount} rätt | 🔴 ${wrongCount} fel (Totalt ${answered} frågor).`;
+    } else {
+      questionEl.textContent = lives > 0 ? "🏆 ÄVENTYR KLART!" : "🛡️ JÄRNSPIKAR, NÄSTA GÅNG KLARAR DU DET!";
+      $("monster").textContent = lives > 0 ? "👑" : "💖";
+      hint.textContent = lives > 0 ? "Du klarade alla 21 frågor! Tryck på Starta nytt spel för att spela igen." : "Du gjorde ditt bästa! Tryck på Starta nytt spel för att spela igen.";
+      feedback.textContent = `Du fick ${score} poäng och svarade på ${answered} frågor (🟢 ${correctCount} rätt, 🔴 ${wrongCount} fel).`;
+    }
+  }
+
+  // Event listeners
+  $("btnMixed").addEventListener("click", () => startAdventure('mixed'));
+  $("btnHard").addEventListener("click", () => startAdventure('hard'));
+  $("btnTimed").addEventListener("click", () => startAdventure('timed'));
+  $("divisionBtn").addEventListener("click", () => startAdventure('division'));
+  
+  document.querySelectorAll(".table-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => startAdventure(e.target.dataset.table));
+  });
+
+  buttons.forEach(btn => btn.addEventListener("click", (e) => answer(btn.dataset.value, e.target)));
+  
+  $("hintBtn").addEventListener("click", () => {
+    if (locked || $("gamePlayArea").style.display === "none") return;
+    if (selectedMode === 'division') {
+      const parts = questionEl.textContent.split(" / ");
+      const total = parseInt(parts[0], 10);
+      const divisor = parseInt(parts[1], 10);
+      if (!Number.isFinite(total) || !Number.isFinite(divisor)) return;
+      hint.textContent = `💡 Ledtråd: Hur många gånger får ${divisor} plats i ${total}? Tänk på ${divisor} × ? = ${total}.`;
+    } else {
+      const [a,b] = questionEl.textContent.split(" × ").map(s => parseInt(s,10));
+      if (!Number.isFinite(a) || !Number.isFinite(b)) return;
+      hint.textContent = `💡 Ledtråd: ${a} × ${b} betyder ${a} grupper med ${b}. Räkna ${b} + ${b} + ${b} ...`;
+    }
+  });
+
+  // Toggle Facit
+  $("facitBtn").addEventListener("click", () => {
+    const container = $("cheatSheetContainer");
+    const btn = $("facitBtn");
+    if (container.style.display === "none") {
+      container.style.display = "block";
+      btn.textContent = "📖 Dölj facit";
+      container.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      container.style.display = "none";
+      btn.textContent = "📖 Visa facit";
+    }
+  });
+
+  $("restartBtn").addEventListener("click", showMenu);
+
+  document.addEventListener("keydown", e => {
+    if (["1","2","3","4","5","6"].includes(e.key) && !locked && $("gamePlayArea").style.display !== "none") {
+      const btn = buttons[Number(e.key)-1];
+      if (btn && !btn.disabled) answer(btn.dataset.value, btn);
+    }
+  });
+
+  showMenu();
+})();
+</script>
+</body>
+</html>
